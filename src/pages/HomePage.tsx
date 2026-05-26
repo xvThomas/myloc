@@ -10,6 +10,7 @@ export default function HomePage() {
   const { position, error, loading } = useGeolocation();
   const { canInstall, install } = useInstallPrompt();
   const [hasFlown, setHasFlown] = useState(false);
+  const [zoom, setZoom] = useState(6);
 
   // Center on user position on first geolocation fix
   useEffect(() => {
@@ -32,10 +33,13 @@ export default function HomePage() {
         initialViewState={{ longitude: 2.35, latitude: 46.85, zoom: 6 }}
         style={{ width: "100%", height: "100%" }}
         mapStyle={IGN_STYLE}
+        onZoom={(e) => setZoom(e.viewState.zoom)}
+        minZoom={6}
+        maxZoom={18.99}
       >
         {position && (
           <Marker longitude={position.lng} latitude={position.lat} anchor="center">
-            <div className="h-8 w-8 rounded-full border-2 border-white bg-blue-600 shadow-lg" />
+            <div className="h-6 w-6 rounded-full border-2 border-white bg-blue-600 shadow-lg" />
           </Marker>
         )}
       </Map>
@@ -60,6 +64,13 @@ export default function HomePage() {
         >
           Installer l'app
         </button>
+      )}
+
+      {/* Coordinates & zoom */}
+      {position && (
+        <div className="absolute bottom-6 left-4 rounded-lg bg-white/90 px-3 py-1.5 text-xs font-mono shadow">
+          {position.lat.toFixed(2)}, {position.lng.toFixed(2)} · z{zoom.toFixed(1)}
+        </div>
       )}
 
       {/* Recenter button */}
