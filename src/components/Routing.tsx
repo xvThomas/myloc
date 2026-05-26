@@ -6,9 +6,10 @@ type MapClickHandler = (event: MapLayerMouseEvent) => void;
 
 interface RoutingProps {
   onMapClickChange: (handler: MapClickHandler) => void;
+  onPointsChange: (start: LatLng | null, end: LatLng | null) => void;
 }
 
-export default function Routing({ onMapClickChange }: RoutingProps) {
+export default function Routing({ onMapClickChange, onPointsChange }: RoutingProps) {
   const [clickStep, setClickStep] = useState(0);
   const [startCoords, setStartCoords] = useState<LatLng | null>(null);
   const [endCoords, setEndCoords] = useState<LatLng | null>(null);
@@ -40,6 +41,10 @@ export default function Routing({ onMapClickChange }: RoutingProps) {
   useEffect(() => {
     onMapClickChange(() => handleMapClick);
   }, [handleMapClick, onMapClickChange]);
+
+  useEffect(() => {
+    onPointsChange(startCoords, endCoords);
+  }, [startCoords, endCoords, onPointsChange]);
 
   return (
     <>
