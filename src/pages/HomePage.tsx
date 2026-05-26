@@ -20,8 +20,8 @@ export default function HomePage() {
   }, [position, hasFlown]);
 
   const recenter = useCallback(() => {
-    if (position) {
-      mapRef.current?.flyTo({ center: [position.lng, position.lat], zoom: 15 });
+    if (position && mapRef.current) {
+      mapRef.current.flyTo({ center: [position.lng, position.lat] });
     }
   }, [position]);
 
