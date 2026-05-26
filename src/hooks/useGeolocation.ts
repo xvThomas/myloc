@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import type { LatLng } from "../types/geo";
 
 interface GeolocationState {
-  position: { lat: number; lng: number } | null;
+  position: LatLng | null;
   error: string | null;
   loading: boolean;
 }

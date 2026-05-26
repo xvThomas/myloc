@@ -1,7 +1,13 @@
 import { useRef, useCallback, useState, useEffect } from "react";
-import Map, { Marker, type MapRef } from "react-map-gl/maplibre";
+import Map, { type MapRef, type MapLayerMouseEvent } from "react-map-gl/maplibre";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useInstallPrompt } from "../hooks/useInstallPrompt";
+import CurrentLocation from "../components/CurrentLocation";
+import GPSStatus from "../components/GPSStatus";
+import Coordinates from "../components/Coordinates";
+import CenterButton from "../components/CenterButton";
+import InstallButton from "../components/InstallButton";
+import Routing from "../components/Routing";
 
 const IGN_STYLE = "https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/standard.json";
 
@@ -11,6 +17,7 @@ export default function HomePage() {
   const { canInstall, install } = useInstallPrompt();
   const [hasFlown, setHasFlown] = useState(false);
   const [zoom, setZoom] = useState(6);
+  const [mapClickHandler, setMapClickHandler] = useState<(event: MapLayerMouseEvent) => void>(() => () => {});
 
   // Center on user position on first geolocation fix
   useEffect(() => {
@@ -34,61 +41,17 @@ export default function HomePage() {
         style={{ width: "100%", height: "100%" }}
         mapStyle={IGN_STYLE}
         onZoom={(e) => setZoom(e.viewState.zoom)}
+        onClick={mapClickHandler}
         minZoom={6}
         maxZoom={18.99}
       >
-        {position && (
-          <Marker longitude={position.lng} latitude={position.lat} anchor="center">
-            <div className="h-6 w-6 rounded-full border-2 border-white bg-blue-600 shadow-lg" />
-          </Marker>
-        )}
+        <CurrentLocation position={position} />
       </Map>
-
-      {/* GPS status overlay */}
-      {loading && (
-        <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-sm shadow">
-          Localisation en cours…
-        </div>
-      )}
-      {error && (
-        <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-red-100 px-4 py-2 text-sm text-red-700 shadow">
-          {error}
-        </div>
-      )}
-
-      {/* Install button */}
-      {canInstall && (
-        <button
-          onClick={install}
-          className="absolute left-4 top-4 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg active:bg-blue-700"
-        >
-          Installer l'app
-        </button>
-      )}
-
-      {/* Coordinates & zoom */}
-      {position && (
-        <div className="absolute bottom-6 left-4 rounded-lg bg-white/90 px-3 py-1.5 text-xs font-mono shadow">
-          {position.lat.toFixed(2)}, {position.lng.toFixed(2)} · z{zoom.toFixed(1)}
-        </div>
-      )}
-
-      {/* Recenter button */}
-      {position && (
-        <button
-          onClick={recenter}
-          className="absolute bottom-6 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg active:bg-gray-100"
-          aria-label="Recentrer"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 text-blue-600">
-            <path
-              fillRule="evenodd"
-              d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 00-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.145.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      )}
+      <GPSStatus loading={loading} error={error} />
+      <Routing onMapClickChange={setMapClickHandler} />
+      <InstallButton canInstall={canInstall} onInstall={install} />
+      <Coordinates position={position} zoom={zoom} />
+      <CenterButton position={position} onRecenter={recenter} />
     </div>
   );
 }
