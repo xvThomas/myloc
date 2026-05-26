@@ -35,7 +35,7 @@ export default function HomePage() {
       >
         {position && (
           <Marker longitude={position.lng} latitude={position.lat} anchor="center">
-            <div className="h-4 w-4 rounded-full border-2 border-white bg-blue-600 shadow-lg" />
+            <div className="h-8 w-8 rounded-full border-2 border-white bg-blue-600 shadow-lg" />
           </Marker>
         )}
       </Map>
