@@ -6,13 +6,14 @@ interface RouteFlagsProps {
   end: LatLng | null;
   waypoints?: LatLng[];
   routeComputed?: boolean;
+  id?: string;
 }
 
-export default function RouteFlags({ start, end, waypoints = [], routeComputed = false }: RouteFlagsProps) {
+export default function RouteFlags({ start, end, waypoints = [], routeComputed = false, id = "default" }: RouteFlagsProps) {
   return (
     <>
       {start && (
-        <Marker longitude={start.lng} latitude={start.lat} anchor="center">
+        <Marker key={`${id}-start`} longitude={start.lng} latitude={start.lat} anchor="center">
           <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white bg-emerald-500 shadow text-[10px] font-bold text-black">
             D
           </div>
@@ -20,7 +21,7 @@ export default function RouteFlags({ start, end, waypoints = [], routeComputed =
       )}
 
       {!routeComputed && waypoints.map((wp, i) => (
-        <Marker key={i} longitude={wp.lng} latitude={wp.lat} anchor="center">
+        <Marker key={`${id}-wp-${i}`} longitude={wp.lng} latitude={wp.lat} anchor="center">
           <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-amber-500 text-[10px] font-bold text-white shadow">
             {i + 1}
           </div>
@@ -28,7 +29,7 @@ export default function RouteFlags({ start, end, waypoints = [], routeComputed =
       ))}
 
       {end && (
-        <Marker longitude={end.lng} latitude={end.lat} anchor="center">
+        <Marker key={`${id}-end`} longitude={end.lng} latitude={end.lat} anchor="center">
           <div
             className="flex h-6 w-6 items-center justify-center rounded-full border border-white shadow text-[10px] font-bold text-white"
             style={{

@@ -9,14 +9,11 @@ import CenterButton from "../components/CenterButton";
 import InstallButton from "../components/InstallButton";
 import Routing from "../components/Routing";
 import RouteFlags from "../components/RouteFlags";
-import RouteLayer from "../components/RouteLayer";
-import VehicleMarker from "../components/VehicleMarker";
-import PedestrianRouteLayer from "../components/PedestrianRouteLayer";
+import RouteInstance from "../components/RouteInstance";
+import type { RouteInstanceInfo } from "../components/RouteInstance";
 import MeetingInfo from "../components/MeetingInfo";
 import type { LatLng } from "../types/geo";
 import type { RouteResult } from "../services/routeService";
-import { useVehicleSimulation } from "../hooks/useVehicleSimulation";
-import { useMeetingPoint, computeRemainingPedestrianTime } from "../hooks/useMeetingPoint";
 
 const IGN_STYLE = "https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/standard.json";
 const DRAG_CLICK_GUARD_MS = 250;
@@ -32,20 +29,32 @@ export default function HomePage() {
   const [routeStart, setRouteStart] = useState<LatLng | null>(null);
   const [routeWaypoints, setRouteWaypoints] = useState<LatLng[]>([]);
   const [routeEnd, setRouteEnd] = useState<LatLng | null>(null);
-  const [route, setRoute] = useState<RouteResult | null>(null);
-  const vehicle = useVehicleSimulation(route);
-  const { result: meetingResult, computing: meetingComputing, compute: computeMeeting, clear: clearMeeting } = useMeetingPoint();
+  const [routes, setRoutes] = useState<RouteResult[]>([]);
+  const [routeInfos, setRouteInfos] = useState<RouteInstanceInfo[]>([]);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState<number | null>(null);
   const lastDragEndAtRef = useRef(0);
 
-  // Clear meeting point when route changes
-  useEffect(() => { clearMeeting(); }, [route, clearMeeting]);
-
-  // Auto-compute meeting point when vehicle route is ready and GPS position is available
-  useEffect(() => {
-    if (vehicle && position && !meetingResult && !meetingComputing) {
-      computeMeeting(position, vehicle.timedPoints, vehicle.currentTimeSec);
+  // Append new route to the list
+  const handleRouteChange = useCallback((newRoute: RouteResult | null) => {
+    if (newRoute) {
+      setRoutes((prev) => [...prev, newRoute]);
+      setRouteInfos((prev) => [...prev, { pedestrianTimeSec: 0, vehicleTimeSec: 0, computing: true }]);
     }
-  }, [vehicle, position, meetingResult, meetingComputing, computeMeeting]);
+  }, []);
+
+  // Callback for RouteInstance to report its meeting info
+  const handleRouteInfoChange = useCallback((index: number, info: RouteInstanceInfo) => {
+    setRouteInfos((prev) => {
+      if (prev[index]?.pedestrianTimeSec === info.pedestrianTimeSec &&
+          prev[index]?.vehicleTimeSec === info.vehicleTimeSec &&
+          prev[index]?.computing === info.computing) {
+        return prev;
+      }
+      const next = [...prev];
+      next[index] = info;
+      return next;
+    });
+  }, []);
 
   // Center on user position on first geolocation fix
   useEffect(() => {
@@ -66,9 +75,29 @@ export default function HomePage() {
       if (Date.now() - lastDragEndAtRef.current < DRAG_CLICK_GUARD_MS) {
         return;
       }
+
+      // Check if a route layer was clicked
+      if (mapRef.current && routes.length > 0) {
+        const layerIds = routes.flatMap((_, i) => [
+          `route-${i}-line`,
+          `pedestrian-route-${i}-line`,
+        ]);
+        const features = mapRef.current.queryRenderedFeatures(event.point, { layers: layerIds });
+        if (features && features.length > 0) {
+          const layerId = features[0]!.layer.id;
+          const match = layerId.match(/route-(\d+)-line/);
+          if (match) {
+            setSelectedRouteIndex(Number(match[1]));
+            return;
+          }
+        }
+      }
+
+      // Click on empty area: deselect and delegate to routing
+      setSelectedRouteIndex(null);
       mapClickHandler(event);
     },
-    [mapClickHandler]
+    [mapClickHandler, routes]
   );
 
   const handleContextMenu = useCallback(
@@ -100,10 +129,17 @@ export default function HomePage() {
         maxZoom={18.99}
       >
         <CurrentLocation position={position} />
-        <RouteFlags start={routeStart} end={routeEnd} waypoints={routeWaypoints} routeComputed={!!route} />
-        <RouteLayer route={route} />
-        <PedestrianRouteLayer route={meetingResult?.pedestrianRoute ?? null} />
-        <VehicleMarker vehicle={vehicle} />
+        <RouteFlags start={routeStart} end={routeEnd} waypoints={routeWaypoints} routeComputed={false} id="current" />
+        {routes.map((r, i) => (
+          <RouteInstance
+            key={i}
+            route={r}
+            routeIndex={i}
+            userPosition={position}
+            selected={selectedRouteIndex === i}
+            onInfoChange={handleRouteInfoChange}
+          />
+        ))}
       </Map>
       <GPSStatus loading={loading} error={error} />
       <Routing
@@ -114,40 +150,25 @@ export default function HomePage() {
           setRouteEnd(end);
           setRouteWaypoints(waypoints);
         }}
-        onRouteChange={setRoute}
+        onRouteChange={handleRouteChange}
       />
       <InstallButton canInstall={canInstall} onInstall={install} />
       <Coordinates position={position} zoom={zoom} />
       <CenterButton position={position} onRecenter={recenter} />
-      {(meetingResult || meetingComputing) && (
-        <MeetingInfo
-          pedestrianTimeSec={
-            meetingResult && position
-              ? computeRemainingPedestrianTime(position, meetingResult.pedestrianTimedPoints)
-              : meetingResult?.pedestrianTimeSec ?? 0
-          }
-          vehicleTimeSec={
-            meetingResult && vehicle
-              ? (() => {
-                  const mp = meetingResult.meetingPointCumulativeTime;
-                  const ct = vehicle.currentTimeSec;
-                  const total = meetingResult.totalDurationSec;
-                  if (vehicle.isForward) {
-                    // Forward: vehicle goes 0 → total
-                    return ct <= mp
-                      ? mp - ct
-                      : (total - ct) + (total - mp);
-                  } else {
-                    // Backward: vehicle goes total → 0
-                    return ct >= mp
-                      ? ct - mp
-                      : ct + mp;
-                  }
-                })()
-              : 0
-          }
-          computing={meetingComputing}
-        />
+      {routeInfos.length > 0 && (
+        <div className="absolute right-2 top-4 z-50 flex flex-col gap-2">
+          {routeInfos.map((info, i) => (
+            <MeetingInfo
+              key={i}
+              routeLabel={`Itinéraire ${i + 1}`}
+              pedestrianTimeSec={info.pedestrianTimeSec}
+              vehicleTimeSec={info.vehicleTimeSec}
+              computing={info.computing}
+              selected={selectedRouteIndex === i}
+              onClick={() => setSelectedRouteIndex(selectedRouteIndex === i ? null : i)}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

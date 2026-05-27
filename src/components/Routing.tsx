@@ -28,8 +28,7 @@ export default function Routing({ onMapClickChange, onContextMenuChange, onPoint
     setEndCoords(null);
     setPhase("idle");
     setError(null);
-    onRouteChange(null);
-  }, [onRouteChange]);
+  }, []);
 
   const handleMapClick = useCallback(
     (event: MapLayerMouseEvent) => {
@@ -40,7 +39,6 @@ export default function Routing({ onMapClickChange, onContextMenuChange, onPoint
         setWaypoints([]);
         setEndCoords(null);
         setError(null);
-        onRouteChange(null);
         setPhase("waypoints");
         return;
       }
@@ -62,7 +60,6 @@ export default function Routing({ onMapClickChange, onContextMenuChange, onPoint
         setWaypoints([]);
         setEndCoords(null);
         setError(null);
-        onRouteChange(null);
         setPhase("waypoints");
       }
     },

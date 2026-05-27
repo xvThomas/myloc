@@ -3,9 +3,11 @@ import type { RouteResult } from "../services/routeService";
 
 interface RouteLayerProps {
   route: RouteResult | null;
+  id?: string;
+  selected?: boolean;
 }
 
-export default function RouteLayer({ route }: RouteLayerProps) {
+export default function RouteLayer({ route, id = "route", selected = false }: RouteLayerProps) {
   if (!route) return null;
 
   const geojson: GeoJSON.Feature = {
@@ -15,9 +17,24 @@ export default function RouteLayer({ route }: RouteLayerProps) {
   };
 
   return (
-    <Source id="route" type="geojson" data={geojson}>
+    <Source id={id} type="geojson" data={geojson}>
+      {selected && (
+        <Layer
+          id={`${id}-line-highlight`}
+          type="line"
+          paint={{
+            "line-color": "#dc2626",
+            "line-width": 10,
+            "line-opacity": 0.5,
+          }}
+          layout={{
+            "line-cap": "round",
+            "line-join": "round",
+          }}
+        />
+      )}
       <Layer
-        id="route-line"
+        id={`${id}-line`}
         type="line"
         paint={{
           "line-color": "#dc2626",
