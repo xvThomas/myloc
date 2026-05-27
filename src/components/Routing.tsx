@@ -89,6 +89,9 @@ export default function Routing({ onMapClickChange, onContextMenuChange, onPoint
     setError(null);
     try {
       const result = await computeRoute(startCoords, endCoords, waypoints);
+      // Snap start/end markers to actual snapped positions from API
+      setStartCoords(result.start);
+      setEndCoords(result.end);
       onRouteChange(result);
       setPhase("done");
     } catch (err) {

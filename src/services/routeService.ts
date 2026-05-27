@@ -13,6 +13,8 @@ export interface RouteResult {
   distance: number;
   duration: number;
   steps: RouteStep[];
+  start: LatLng;
+  end: LatLng;
 }
 
 const BASE_URL = "https://data.geopf.fr/navigation/itineraire";
@@ -46,11 +48,16 @@ export async function computeRoute(start: LatLng, end: LatLng, intermediates: La
     (portion: { steps: RouteStep[] }) => portion.steps
   );
 
+  const [sLng, sLat] = data.start.split(",").map(Number);
+  const [eLng, eLat] = data.end.split(",").map(Number);
+
   return {
     geometry: data.geometry,
     distance: data.distance,
     duration: data.duration,
     steps,
+    start: { lat: sLat, lng: sLng },
+    end: { lat: eLat, lng: eLng },
   };
 }
 
@@ -79,10 +86,15 @@ export async function computePedestrianRoute(start: LatLng, end: LatLng): Promis
     (portion: { steps: RouteStep[] }) => portion.steps
   );
 
+  const [sLng, sLat] = data.start.split(",").map(Number);
+  const [eLng, eLat] = data.end.split(",").map(Number);
+
   return {
     geometry: data.geometry,
     distance: data.distance,
     duration: data.duration,
     steps,
+    start: { lat: sLat, lng: sLng },
+    end: { lat: eLat, lng: eLng },
   };
 }
