@@ -5,9 +5,11 @@ import type { RouteResult } from "../services/routeService";
 export interface VehicleState {
   position: LatLng;
   speedKmh: number;
+  currentTimeSec: number;
+  timedPoints: TimedPoint[];
 }
 
-interface TimedPoint {
+export interface TimedPoint {
   lng: number;
   lat: number;
   // Cumulative time in seconds from route start to reach this point
@@ -57,7 +59,7 @@ function buildTimedPoints(route: RouteResult): TimedPoint[] {
 }
 
 // Interpolate position and compute speed at a given time (seconds)
-function interpolateAtTime(points: TimedPoint[], timeSec: number): VehicleState {
+function interpolateAtTime(points: TimedPoint[], timeSec: number): Pick<VehicleState, "position" | "speedKmh"> {
   if (timeSec <= 0) {
     const p = points[0]!;
     return { position: { lng: p.lng, lat: p.lat }, speedKmh: 0 };
@@ -126,7 +128,8 @@ export function useVehicleSimulation(route: RouteResult | null): VehicleState | 
         ? (cycleTime / 1000)
         : totalDurationSec - ((cycleTime - totalDurationMs) / 1000);
 
-      setVehicleState(interpolateAtTime(timedPoints, currentTimeSec));
+      const state = interpolateAtTime(timedPoints, currentTimeSec);
+      setVehicleState({ ...state, currentTimeSec, timedPoints });
       rafRef.current = requestAnimationFrame(animate);
     };
 

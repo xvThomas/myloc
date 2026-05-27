@@ -11,9 +11,12 @@ import Routing from "../components/Routing";
 import RouteFlags from "../components/RouteFlags";
 import RouteLayer from "../components/RouteLayer";
 import VehicleMarker from "../components/VehicleMarker";
+import PedestrianRouteLayer from "../components/PedestrianRouteLayer";
+import MeetingInfo from "../components/MeetingInfo";
 import type { LatLng } from "../types/geo";
 import type { RouteResult } from "../services/routeService";
 import { useVehicleSimulation } from "../hooks/useVehicleSimulation";
+import { useMeetingPoint, computeRemainingPedestrianTime } from "../hooks/useMeetingPoint";
 
 const IGN_STYLE = "https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/standard.json";
 const DRAG_CLICK_GUARD_MS = 250;
@@ -29,7 +32,17 @@ export default function HomePage() {
   const [routeEnd, setRouteEnd] = useState<LatLng | null>(null);
   const [route, setRoute] = useState<RouteResult | null>(null);
   const vehicle = useVehicleSimulation(route);
+  const { result: meetingResult, computing: meetingComputing, compute: computeMeeting, clear: clearMeeting } = useMeetingPoint();
   const lastDragEndAtRef = useRef(0);
+
+  // Clear meeting point when route changes
+  useEffect(() => { clearMeeting(); }, [route, clearMeeting]);
+
+  const handleMeetVehicle = useCallback(() => {
+    if (position && vehicle) {
+      computeMeeting(position, vehicle.timedPoints, vehicle.currentTimeSec);
+    }
+  }, [position, vehicle, computeMeeting]);
 
   // Center on user position on first geolocation fix
   useEffect(() => {
@@ -75,6 +88,7 @@ export default function HomePage() {
         <CurrentLocation position={position} />
         <RouteFlags start={routeStart} end={routeEnd} />
         <RouteLayer route={route} />
+        <PedestrianRouteLayer route={meetingResult?.pedestrianRoute ?? null} />
         <VehicleMarker vehicle={vehicle} />
       </Map>
       <GPSStatus loading={loading} error={error} />
@@ -89,6 +103,31 @@ export default function HomePage() {
       <InstallButton canInstall={canInstall} onInstall={install} />
       <Coordinates position={position} zoom={zoom} />
       <CenterButton position={position} onRecenter={recenter} />
+      {vehicle && position && !meetingResult && !meetingComputing && (
+        <button
+          onClick={handleMeetVehicle}
+          className="absolute right-4 top-4 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-lg"
+        >
+          Rejoindre le véhicule
+        </button>
+      )}
+      {(meetingResult || meetingComputing) && (
+        <MeetingInfo
+          pedestrianTimeSec={
+            meetingResult && position
+              ? computeRemainingPedestrianTime(position, meetingResult.pedestrianTimedPoints)
+              : meetingResult?.pedestrianTimeSec ?? 0
+          }
+          vehicleTimeSec={
+            meetingResult && vehicle
+              ? meetingResult.meetingPointCumulativeTime >= vehicle.currentTimeSec
+                ? meetingResult.meetingPointCumulativeTime - vehicle.currentTimeSec
+                : meetingResult.totalDurationSec - vehicle.currentTimeSec + meetingResult.meetingPointCumulativeTime
+              : 0
+          }
+          computing={meetingComputing}
+        />
+      )}
     </div>
   );
 }

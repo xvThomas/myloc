@@ -49,3 +49,36 @@ export async function computeRoute(start: LatLng, end: LatLng): Promise<RouteRes
     steps,
   };
 }
+
+export async function computePedestrianRoute(start: LatLng, end: LatLng): Promise<RouteResult> {
+  const params = new URLSearchParams({
+    resource: "bdtopo-osrm",
+    start: `${start.lng},${start.lat}`,
+    end: `${end.lng},${end.lat}`,
+    profile: "pedestrian",
+    optimization: "fastest",
+    getSteps: "true",
+    geometryFormat: "geojson",
+    distanceUnit: "meter",
+    timeUnit: "second",
+  });
+
+  const response = await fetch(`${BASE_URL}?${params}`);
+
+  if (!response.ok) {
+    throw new Error(`Erreur API itinéraire piéton (${response.status})`);
+  }
+
+  const data = await response.json();
+
+  const steps: RouteStep[] = data.portions.flatMap(
+    (portion: { steps: RouteStep[] }) => portion.steps
+  );
+
+  return {
+    geometry: data.geometry,
+    distance: data.distance,
+    duration: data.duration,
+    steps,
+  };
+}
