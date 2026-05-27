@@ -28,7 +28,9 @@ export default function HomePage() {
   const [hasFlown, setHasFlown] = useState(false);
   const [zoom, setZoom] = useState(6);
   const [mapClickHandler, setMapClickHandler] = useState<(event: MapLayerMouseEvent) => void>(() => () => {});
+  const [mapContextMenuHandler, setMapContextMenuHandler] = useState<(event: MapLayerMouseEvent) => void>(() => () => {});
   const [routeStart, setRouteStart] = useState<LatLng | null>(null);
+  const [routeWaypoints, setRouteWaypoints] = useState<LatLng[]>([]);
   const [routeEnd, setRouteEnd] = useState<LatLng | null>(null);
   const [route, setRoute] = useState<RouteResult | null>(null);
   const vehicle = useVehicleSimulation(route);
@@ -69,6 +71,16 @@ export default function HomePage() {
     [mapClickHandler]
   );
 
+  const handleContextMenu = useCallback(
+    (event: MapLayerMouseEvent) => {
+      if (Date.now() - lastDragEndAtRef.current < DRAG_CLICK_GUARD_MS) {
+        return;
+      }
+      mapContextMenuHandler(event);
+    },
+    [mapContextMenuHandler]
+  );
+
   const handleMapDragEnd = useCallback(() => {
     lastDragEndAtRef.current = Date.now();
   }, []);
@@ -82,12 +94,13 @@ export default function HomePage() {
         mapStyle={IGN_STYLE}
         onZoom={(e) => setZoom(e.viewState.zoom)}
         onClick={handleMapClick}
+        onContextMenu={handleContextMenu}
         onDragEnd={handleMapDragEnd}
         minZoom={6}
         maxZoom={18.99}
       >
         <CurrentLocation position={position} />
-        <RouteFlags start={routeStart} end={routeEnd} />
+        <RouteFlags start={routeStart} end={routeEnd} waypoints={routeWaypoints} routeComputed={!!route} />
         <RouteLayer route={route} />
         <PedestrianRouteLayer route={meetingResult?.pedestrianRoute ?? null} />
         <VehicleMarker vehicle={vehicle} />
@@ -95,9 +108,11 @@ export default function HomePage() {
       <GPSStatus loading={loading} error={error} />
       <Routing
         onMapClickChange={setMapClickHandler}
-        onPointsChange={(start, end) => {
+        onContextMenuChange={setMapContextMenuHandler}
+        onPointsChange={(start, end, waypoints) => {
           setRouteStart(start);
           setRouteEnd(end);
+          setRouteWaypoints(waypoints);
         }}
         onRouteChange={setRoute}
       />

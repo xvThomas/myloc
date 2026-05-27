@@ -4,24 +4,27 @@ import type { LatLng } from "../types/geo";
 import { computeRoute, type RouteResult } from "../services/routeService";
 import RouteDialog from "./RouteDialog";
 
-type Phase = "idle" | "start" | "dialog" | "computing" | "done";
+type Phase = "idle" | "waypoints" | "settingEnd" | "dialog" | "computing" | "done";
 type MapClickHandler = (event: MapLayerMouseEvent) => void;
 
 interface RoutingProps {
   onMapClickChange: (handler: MapClickHandler) => void;
-  onPointsChange: (start: LatLng | null, end: LatLng | null) => void;
+  onContextMenuChange: (handler: MapClickHandler) => void;
+  onPointsChange: (start: LatLng | null, end: LatLng | null, waypoints: LatLng[]) => void;
   onRouteChange: (route: RouteResult | null) => void;
 }
 
-export default function Routing({ onMapClickChange, onPointsChange, onRouteChange }: RoutingProps) {
+export default function Routing({ onMapClickChange, onContextMenuChange, onPointsChange, onRouteChange }: RoutingProps) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [startCoords, setStartCoords] = useState<LatLng | null>(null);
+  const [waypoints, setWaypoints] = useState<LatLng[]>([]);
   const [endCoords, setEndCoords] = useState<LatLng | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reset = useCallback(() => {
     setStartCoords(null);
+    setWaypoints([]);
     setEndCoords(null);
     setPhase("idle");
     setError(null);
@@ -34,29 +37,49 @@ export default function Routing({ onMapClickChange, onPointsChange, onRouteChang
 
       if (phase === "idle") {
         setStartCoords({ lat, lng });
+        setWaypoints([]);
         setEndCoords(null);
         setError(null);
         onRouteChange(null);
-        setPhase("start");
+        setPhase("waypoints");
         return;
       }
 
-      if (phase === "start") {
+      if (phase === "waypoints") {
+        setWaypoints((prev) => [...prev, { lat, lng }]);
+        return;
+      }
+
+      // Next tap after pressing "Définir l'arrivée" sets the end point
+      if (phase === "settingEnd") {
         setEndCoords({ lat, lng });
         setPhase("dialog");
         return;
       }
 
       if (phase === "done") {
-        // New click after route displayed: reset and start fresh
         setStartCoords({ lat, lng });
+        setWaypoints([]);
         setEndCoords(null);
         setError(null);
         onRouteChange(null);
-        setPhase("start");
+        setPhase("waypoints");
       }
     },
     [phase, onRouteChange]
+  );
+
+  // Right-click (desktop) / long-press: set end point
+  const handleContextMenu = useCallback(
+    (event: MapLayerMouseEvent) => {
+      const { lat, lng } = event.lngLat;
+
+      if (phase === "waypoints" || phase === "settingEnd") {
+        setEndCoords({ lat, lng });
+        setPhase("dialog");
+      }
+    },
+    [phase]
   );
 
   const handleCalculate = useCallback(async () => {
@@ -65,7 +88,7 @@ export default function Routing({ onMapClickChange, onPointsChange, onRouteChang
     setLoading(true);
     setError(null);
     try {
-      const result = await computeRoute(startCoords, endCoords);
+      const result = await computeRoute(startCoords, endCoords, waypoints);
       onRouteChange(result);
       setPhase("done");
     } catch (err) {
@@ -74,7 +97,7 @@ export default function Routing({ onMapClickChange, onPointsChange, onRouteChang
     } finally {
       setLoading(false);
     }
-  }, [startCoords, endCoords, onRouteChange]);
+  }, [startCoords, endCoords, waypoints, onRouteChange]);
 
   const handleCancel = useCallback(() => {
     reset();
@@ -85,20 +108,32 @@ export default function Routing({ onMapClickChange, onPointsChange, onRouteChang
   }, [handleMapClick, onMapClickChange]);
 
   useEffect(() => {
-    onPointsChange(startCoords, endCoords);
-  }, [startCoords, endCoords, onPointsChange]);
+    onContextMenuChange(() => handleContextMenu);
+  }, [handleContextMenu, onContextMenuChange]);
+
+  useEffect(() => {
+    onPointsChange(startCoords, endCoords, waypoints);
+  }, [startCoords, endCoords, waypoints, onPointsChange]);
 
   return (
     <>
-      {startCoords && (
-        <div className="absolute left-1/2 top-16 -translate-x-1/2 rounded-lg bg-white/90 px-3 py-2 text-sm font-mono shadow">
-          Départ: {startCoords.lat.toFixed(2)}, {startCoords.lng.toFixed(2)}
+      {phase === "waypoints" && (
+        <div className="absolute left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2">
+          <span className="rounded-full bg-white/90 px-3 py-2 text-xs text-slate-600 shadow">
+            Tap = étape
+          </span>
+          <button
+            onClick={() => setPhase("settingEnd")}
+            className="rounded-full bg-red-600 px-4 py-2 text-xs font-medium text-white shadow active:bg-red-700"
+          >
+            Définir l'arrivée
+          </button>
         </div>
       )}
 
-      {endCoords && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-lg bg-white/90 px-3 py-2 text-sm font-mono shadow">
-          Arrivée: {endCoords.lat.toFixed(2)}, {endCoords.lng.toFixed(2)}
+      {phase === "settingEnd" && (
+        <div className="absolute left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-red-100 px-4 py-2 text-xs font-medium text-red-700 shadow">
+          Touchez la carte pour définir l'arrivée
         </div>
       )}
 

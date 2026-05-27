@@ -17,7 +17,7 @@ export interface RouteResult {
 
 const BASE_URL = "https://data.geopf.fr/navigation/itineraire";
 
-export async function computeRoute(start: LatLng, end: LatLng): Promise<RouteResult> {
+export async function computeRoute(start: LatLng, end: LatLng, intermediates: LatLng[] = []): Promise<RouteResult> {
   const params = new URLSearchParams({
     resource: "bdtopo-osrm",
     start: `${start.lng},${start.lat}`,
@@ -29,6 +29,10 @@ export async function computeRoute(start: LatLng, end: LatLng): Promise<RouteRes
     distanceUnit: "meter",
     timeUnit: "second",
   });
+
+  if (intermediates.length > 0) {
+    params.set("intermediates", intermediates.map((p) => `${p.lng},${p.lat}`).join("|"));
+  }
 
   const response = await fetch(`${BASE_URL}?${params}`);
 
