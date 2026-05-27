@@ -9,7 +9,11 @@ import CenterButton from "../components/CenterButton";
 import InstallButton from "../components/InstallButton";
 import Routing from "../components/Routing";
 import RouteFlags from "../components/RouteFlags";
+import RouteLayer from "../components/RouteLayer";
+import VehicleMarker from "../components/VehicleMarker";
 import type { LatLng } from "../types/geo";
+import type { RouteResult } from "../services/routeService";
+import { useVehicleSimulation } from "../hooks/useVehicleSimulation";
 
 const IGN_STYLE = "https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/standard.json";
 const DRAG_CLICK_GUARD_MS = 250;
@@ -23,6 +27,8 @@ export default function HomePage() {
   const [mapClickHandler, setMapClickHandler] = useState<(event: MapLayerMouseEvent) => void>(() => () => {});
   const [routeStart, setRouteStart] = useState<LatLng | null>(null);
   const [routeEnd, setRouteEnd] = useState<LatLng | null>(null);
+  const [route, setRoute] = useState<RouteResult | null>(null);
+  const vehicle = useVehicleSimulation(route);
   const lastDragEndAtRef = useRef(0);
 
   // Center on user position on first geolocation fix
@@ -68,6 +74,8 @@ export default function HomePage() {
       >
         <CurrentLocation position={position} />
         <RouteFlags start={routeStart} end={routeEnd} />
+        <RouteLayer route={route} />
+        <VehicleMarker vehicle={vehicle} />
       </Map>
       <GPSStatus loading={loading} error={error} />
       <Routing
@@ -76,6 +84,7 @@ export default function HomePage() {
           setRouteStart(start);
           setRouteEnd(end);
         }}
+        onRouteChange={setRoute}
       />
       <InstallButton canInstall={canInstall} onInstall={install} />
       <Coordinates position={position} zoom={zoom} />
