@@ -6,6 +6,7 @@ export interface VehicleState {
   position: LatLng;
   speedKmh: number;
   currentTimeSec: number;
+  isForward: boolean;
   timedPoints: TimedPoint[];
 }
 
@@ -129,7 +130,7 @@ export function useVehicleSimulation(route: RouteResult | null): VehicleState | 
         : totalDurationSec - ((cycleTime - totalDurationMs) / 1000);
 
       const state = interpolateAtTime(timedPoints, currentTimeSec);
-      setVehicleState({ ...state, currentTimeSec, timedPoints });
+      setVehicleState({ ...state, currentTimeSec, isForward: forward, timedPoints });
       rafRef.current = requestAnimationFrame(animate);
     };
 

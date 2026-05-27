@@ -38,11 +38,12 @@ export default function HomePage() {
   // Clear meeting point when route changes
   useEffect(() => { clearMeeting(); }, [route, clearMeeting]);
 
-  const handleMeetVehicle = useCallback(() => {
-    if (position && vehicle) {
+  // Auto-compute meeting point when vehicle route is ready and GPS position is available
+  useEffect(() => {
+    if (vehicle && position && !meetingResult && !meetingComputing) {
       computeMeeting(position, vehicle.timedPoints, vehicle.currentTimeSec);
     }
-  }, [position, vehicle, computeMeeting]);
+  }, [vehicle, position, meetingResult, meetingComputing, computeMeeting]);
 
   // Center on user position on first geolocation fix
   useEffect(() => {
@@ -103,14 +104,6 @@ export default function HomePage() {
       <InstallButton canInstall={canInstall} onInstall={install} />
       <Coordinates position={position} zoom={zoom} />
       <CenterButton position={position} onRecenter={recenter} />
-      {vehicle && position && !meetingResult && !meetingComputing && (
-        <button
-          onClick={handleMeetVehicle}
-          className="absolute right-4 top-4 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-lg"
-        >
-          Rejoindre le véhicule
-        </button>
-      )}
       {(meetingResult || meetingComputing) && (
         <MeetingInfo
           pedestrianTimeSec={
@@ -120,9 +113,22 @@ export default function HomePage() {
           }
           vehicleTimeSec={
             meetingResult && vehicle
-              ? meetingResult.meetingPointCumulativeTime >= vehicle.currentTimeSec
-                ? meetingResult.meetingPointCumulativeTime - vehicle.currentTimeSec
-                : meetingResult.totalDurationSec - vehicle.currentTimeSec + meetingResult.meetingPointCumulativeTime
+              ? (() => {
+                  const mp = meetingResult.meetingPointCumulativeTime;
+                  const ct = vehicle.currentTimeSec;
+                  const total = meetingResult.totalDurationSec;
+                  if (vehicle.isForward) {
+                    // Forward: vehicle goes 0 → total
+                    return ct <= mp
+                      ? mp - ct
+                      : (total - ct) + (total - mp);
+                  } else {
+                    // Backward: vehicle goes total → 0
+                    return ct >= mp
+                      ? ct - mp
+                      : ct + mp;
+                  }
+                })()
               : 0
           }
           computing={meetingComputing}
