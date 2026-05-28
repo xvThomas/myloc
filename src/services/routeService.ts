@@ -8,13 +8,23 @@ export interface RouteStep {
   attributes?: { name?: { nom_1_gauche?: string; nom_1_droite?: string } };
 }
 
+export interface RoutePortion {
+  start: LatLng;
+  end: LatLng;
+  distance: number;
+  duration: number;
+  steps: RouteStep[];
+}
+
 export interface RouteResult {
   geometry: GeoJSON.LineString;
   distance: number;
   duration: number;
   steps: RouteStep[];
+  portions: RoutePortion[];
   start: LatLng;
   end: LatLng;
+  bbox: [number, number, number, number]; // [minLng, minLat, maxLng, maxLat]
 }
 
 const BASE_URL = "https://data.geopf.fr/navigation/itineraire";
@@ -44,9 +54,21 @@ export async function computeRoute(start: LatLng, end: LatLng, intermediates: La
 
   const data = await response.json();
 
-  const steps: RouteStep[] = data.portions.flatMap(
-    (portion: { steps: RouteStep[] }) => portion.steps
+  const portions: RoutePortion[] = data.portions.map(
+    (portion: { start: string; end: string; distance: number; duration: number; steps: RouteStep[] }) => {
+      const [pSLng, pSLat] = portion.start.split(",").map(Number);
+      const [pELng, pELat] = portion.end.split(",").map(Number);
+      return {
+        start: { lat: pSLat, lng: pSLng },
+        end: { lat: pELat, lng: pELng },
+        distance: portion.distance,
+        duration: portion.duration,
+        steps: portion.steps,
+      };
+    }
   );
+
+  const steps: RouteStep[] = portions.flatMap((p) => p.steps);
 
   const [sLng, sLat] = data.start.split(",").map(Number);
   const [eLng, eLat] = data.end.split(",").map(Number);
@@ -56,8 +78,10 @@ export async function computeRoute(start: LatLng, end: LatLng, intermediates: La
     distance: data.distance,
     duration: data.duration,
     steps,
+    portions,
     start: { lat: sLat, lng: sLng },
     end: { lat: eLat, lng: eLng },
+    bbox: data.bbox,
   };
 }
 
@@ -82,9 +106,21 @@ export async function computePedestrianRoute(start: LatLng, end: LatLng): Promis
 
   const data = await response.json();
 
-  const steps: RouteStep[] = data.portions.flatMap(
-    (portion: { steps: RouteStep[] }) => portion.steps
+  const portions: RoutePortion[] = data.portions.map(
+    (portion: { start: string; end: string; distance: number; duration: number; steps: RouteStep[] }) => {
+      const [pSLng, pSLat] = portion.start.split(",").map(Number);
+      const [pELng, pELat] = portion.end.split(",").map(Number);
+      return {
+        start: { lat: pSLat, lng: pSLng },
+        end: { lat: pELat, lng: pELng },
+        distance: portion.distance,
+        duration: portion.duration,
+        steps: portion.steps,
+      };
+    }
   );
+
+  const steps: RouteStep[] = portions.flatMap((p) => p.steps);
 
   const [sLng, sLat] = data.start.split(",").map(Number);
   const [eLng, eLat] = data.end.split(",").map(Number);
@@ -94,7 +130,9 @@ export async function computePedestrianRoute(start: LatLng, end: LatLng): Promis
     distance: data.distance,
     duration: data.duration,
     steps,
+    portions,
     start: { lat: sLat, lng: sLng },
     end: { lat: eLat, lng: eLng },
+    bbox: data.bbox,
   };
 }
