@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre";
 import type { LatLng } from "../types/geo";
+import type { RouteType } from "../types/vehicle";
 import { computeRoute, type RouteResult } from "../services/routeService";
 import VehicleSaveDialog from "./VehicleSaveDialog";
 
@@ -11,8 +12,8 @@ interface VehicleRoutingDriverProps {
   onMapClickChange: (handler: MapClickHandler) => void;
   onContextMenuChange: (handler: MapClickHandler) => void;
   onPointsChange: (start: LatLng | null, end: LatLng | null, waypoints: LatLng[]) => void;
-  onSave: (name: string, routeResult: RouteResult) => void;
-  onSaveAndStart: (name: string, routeResult: RouteResult) => void;
+  onSave: (name: string, routeResult: RouteResult, routeType: RouteType) => void;
+  onSaveAndStart: (name: string, routeResult: RouteResult, routeType: RouteType) => void;
   active: boolean;
 }
 
@@ -105,9 +106,9 @@ export default function VehicleRoutingDriver({
   );
 
   const handleSave = useCallback(
-    (name: string) => {
+    (name: string, routeType: RouteType) => {
       if (computedRoute) {
-        onSave(name, computedRoute);
+        onSave(name, computedRoute, routeType);
         setPhase("done");
       }
     },
@@ -115,9 +116,9 @@ export default function VehicleRoutingDriver({
   );
 
   const handleSaveAndStart = useCallback(
-    (name: string) => {
+    (name: string, routeType: RouteType) => {
       if (computedRoute) {
-        onSaveAndStart(name, computedRoute);
+        onSaveAndStart(name, computedRoute, routeType);
         setPhase("done");
       }
     },

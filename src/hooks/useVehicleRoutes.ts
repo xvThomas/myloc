@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { vehicleRouteApi } from "../services/vehicleRouteApi";
 import type { RouteResult } from "../services/routeService";
-import type { VehiclePosition } from "../types/vehicle";
+import type { VehiclePosition, RouteType } from "../types/vehicle";
 
 const ROUTES_KEY = ["vehicle-routes"] as const;
 
@@ -21,20 +21,29 @@ export function useVehicleRoute(id: string | null) {
 }
 
 export function useVehiclePosition(routeId: string | null, enabled: boolean) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: [...ROUTES_KEY, routeId, "position"],
     queryFn: () => vehicleRouteApi.getPosition(routeId!),
     enabled: !!routeId && enabled,
     refetchInterval: 1000,
-    select: (data) => ("speedKmh" in data ? (data as VehiclePosition) : null),
+    select: (data) => {
+      if (!("speedKmh" in data)) return null;
+      const pos = data as VehiclePosition;
+      // When server auto-stopped the route, invalidate route list so UI reflects the new status
+      if (pos.status === "stopped") {
+        qc.invalidateQueries({ queryKey: ROUTES_KEY });
+      }
+      return pos;
+    },
   });
 }
 
 export function useSaveRoute() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, routeResult }: { name: string; routeResult: RouteResult }) =>
-      vehicleRouteApi.save(name, routeResult),
+    mutationFn: ({ name, routeResult, routeType }: { name: string; routeResult: RouteResult; routeType: RouteType }) =>
+      vehicleRouteApi.save(name, routeResult, routeType),
     onSuccess: () => qc.invalidateQueries({ queryKey: ROUTES_KEY }),
   });
 }

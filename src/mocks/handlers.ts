@@ -1,6 +1,6 @@
 import { http, HttpResponse } from "msw";
 import { getAllRoutes, getRoute, putRoute, deleteRoute } from "./db";
-import type { StoredRoute } from "../types/vehicle";
+import type { StoredRoute, RouteType } from "../types/vehicle";
 import type { RouteResult } from "../services/routeService";
 
 // --- Vehicle interpolation logic (duplicated from useVehicleSimulation for MSW context) ---
@@ -88,7 +88,7 @@ export const handlers = [
   // List all routes (summary only)
   http.get("/api/routes", async () => {
     const routes = await getAllRoutes();
-    const summaries = routes.map(({ id, name, status }) => ({ id, name, status }));
+    const summaries = routes.map(({ id, name, status, routeType }) => ({ id, name, status, routeType: routeType ?? "continuous" }));
     return HttpResponse.json(summaries);
   }),
 
@@ -103,17 +103,19 @@ export const handlers = [
 
   // Create a new route
   http.post("/api/routes", async ({ request }) => {
-    const body = (await request.json()) as { name: string; routeResult: RouteResult };
+    const body = (await request.json()) as { name: string; routeResult: RouteResult; routeType?: RouteType };
     const id = crypto.randomUUID();
+    const routeType = body.routeType ?? "continuous";
     const storedRoute: StoredRoute = {
       id,
       name: body.name,
       status: "idle",
+      routeType,
       routeResult: body.routeResult,
       startedAt: null,
     };
     await putRoute(storedRoute);
-    return HttpResponse.json({ id, name: body.name, status: "idle" }, { status: 201 });
+    return HttpResponse.json({ id, name: body.name, status: "idle", routeType }, { status: 201 });
   }),
 
   // Update route name
@@ -166,26 +168,54 @@ export const handlers = [
       return new HttpResponse(null, { status: 404 });
     }
     if (route.status !== "started" || !route.startedAt) {
-      return HttpResponse.json({ position: null });
+      return HttpResponse.json({ position: null, status: route.status });
     }
 
     const elapsedSec = (Date.now() - route.startedAt) / 1000;
     const timedPoints = buildTimedPoints(route.routeResult);
     if (timedPoints.length < 2) {
-      return HttpResponse.json({ position: null });
+      return HttpResponse.json({ position: null, status: route.status });
     }
 
     const totalDuration = timedPoints[timedPoints.length - 1]!.cumulativeTime;
-    // Ping-pong: forward then backward
+    const routeType = route.routeType ?? "continuous";
+
+    // One-way: stop at end
+    if (routeType === "one_way") {
+      if (elapsedSec >= totalDuration) {
+        route.status = "stopped";
+        await putRoute(route);
+        const last = timedPoints[timedPoints.length - 1]!;
+        return HttpResponse.json({ position: { lng: last.lng, lat: last.lat }, speedKmh: 0, status: "stopped" });
+      }
+      const result = interpolateAtTime(timedPoints, elapsedSec);
+      return HttpResponse.json({ ...result, status: "started" });
+    }
+
+    // Round-trip: stop at start after one full round
+    if (routeType === "round_trip") {
+      if (elapsedSec >= totalDuration * 2) {
+        route.status = "stopped";
+        await putRoute(route);
+        const first = timedPoints[0]!;
+        return HttpResponse.json({ position: { lng: first.lng, lat: first.lat }, speedKmh: 0, status: "stopped" });
+      }
+      const forward = elapsedSec < totalDuration;
+      const currentTime = forward ? elapsedSec : totalDuration - (elapsedSec - totalDuration);
+      const result = interpolateAtTime(timedPoints, currentTime);
+      return HttpResponse.json({ ...result, status: "started" });
+    }
+
+    // Continuous: ping-pong forever
     const cycleTime = elapsedSec % (totalDuration * 2);
     const forward = cycleTime < totalDuration;
     const currentTime = forward ? cycleTime : totalDuration - (cycleTime - totalDuration);
 
     const result = interpolateAtTime(timedPoints, currentTime);
     if (!result) {
-      return HttpResponse.json({ position: null });
+      return HttpResponse.json({ position: null, status: route.status });
     }
 
-    return HttpResponse.json(result);
+    return HttpResponse.json({ ...result, status: "started" });
   }),
 ];

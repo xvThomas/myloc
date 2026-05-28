@@ -1,6 +1,6 @@
 import { http } from "./httpClient";
 import type { RouteResult } from "./routeService";
-import type { SavedRouteSummary, StoredRoute, VehiclePosition } from "../types/vehicle";
+import type { SavedRouteSummary, StoredRoute, VehiclePosition, RouteType } from "../types/vehicle";
 
 export const vehicleRouteApi = {
   list: () => http.get<SavedRouteSummary[]>("/api/routes"),
@@ -8,8 +8,8 @@ export const vehicleRouteApi = {
   getById: (id: string) =>
     http.get<StoredRoute>(`/api/routes/${encodeURIComponent(id)}`),
 
-  save: (name: string, routeResult: RouteResult) =>
-    http.post<SavedRouteSummary>("/api/routes", { name, routeResult }),
+  save: (name: string, routeResult: RouteResult, routeType: RouteType) =>
+    http.post<SavedRouteSummary>("/api/routes", { name, routeResult, routeType }),
 
   start: (id: string) =>
     http.post<void>(`/api/routes/${encodeURIComponent(id)}/start`),
@@ -24,5 +24,5 @@ export const vehicleRouteApi = {
     http.patch<SavedRouteSummary>(`/api/routes/${encodeURIComponent(id)}`, { name }),
 
   getPosition: (id: string) =>
-    http.get<VehiclePosition | { position: null }>(`/api/routes/${encodeURIComponent(id)}/position`),
+    http.get<VehiclePosition | { position: null; status: string }>(`/api/routes/${encodeURIComponent(id)}/position`),
 };

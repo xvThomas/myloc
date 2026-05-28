@@ -18,6 +18,7 @@ import {
 } from "../hooks/useVehicleRoutes";
 import type { RouteResult } from "../services/routeService";
 import type { LatLng } from "../types/geo";
+import type { RouteType } from "../types/vehicle";
 
 const IGN_STYLE = "https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/standard.json";
 
@@ -91,8 +92,8 @@ export default function DriverPage() {
   );
 
   const handleSave = useCallback(
-    async (name: string, routeResult: RouteResult) => {
-      const saved = await saveRouteMutation.mutateAsync({ name, routeResult });
+    async (name: string, routeResult: RouteResult, routeType: RouteType) => {
+      const saved = await saveRouteMutation.mutateAsync({ name, routeResult, routeType });
       setSelectedRouteId(saved.id);
       setCreatingRoute(false);
     },
@@ -100,8 +101,8 @@ export default function DriverPage() {
   );
 
   const handleSaveAndStart = useCallback(
-    async (name: string, routeResult: RouteResult) => {
-      const saved = await saveRouteMutation.mutateAsync({ name, routeResult });
+    async (name: string, routeResult: RouteResult, routeType: RouteType) => {
+      const saved = await saveRouteMutation.mutateAsync({ name, routeResult, routeType });
       await startRouteMutation.mutateAsync(saved.id);
       setSelectedRouteId(saved.id);
       setCreatingRoute(false);
@@ -112,6 +113,8 @@ export default function DriverPage() {
   const handleStart = useCallback(
     async (id: string) => {
       await startRouteMutation.mutateAsync(id);
+      setSelectedRouteId(id);
+      setCreatingRoute(false);
     },
     [startRouteMutation]
   );
