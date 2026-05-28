@@ -31,6 +31,7 @@ export default function VehicleRoutingDriver({
   const [endCoords, setEndCoords] = useState<LatLng | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [computedRoute, setComputedRoute] = useState<RouteResult | null>(null);
+  const [isCircular, setIsCircular] = useState(false);
 
   const reset = useCallback(() => {
     setStartCoords(null);
@@ -39,6 +40,7 @@ export default function VehicleRoutingDriver({
     setPhase("idle");
     setError(null);
     setComputedRoute(null);
+    setIsCircular(false);
   }, []);
 
   // Reset state when entering or leaving creation mode
@@ -85,6 +87,7 @@ export default function VehicleRoutingDriver({
         setStartCoords(result.start);
         setEndCoords(result.end);
         setComputedRoute(result);
+        setIsCircular(false);
         setPhase("saving");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur inconnue");
@@ -93,6 +96,23 @@ export default function VehicleRoutingDriver({
     },
     [startCoords, waypoints]
   );
+
+  const doComputeCircular = useCallback(async () => {
+    if (!startCoords || waypoints.length === 0) return;
+    setPhase("computing");
+    setError(null);
+    try {
+      const result = await computeRoute(startCoords, startCoords, waypoints);
+      setStartCoords(result.start);
+      setEndCoords(result.end);
+      setComputedRoute(result);
+      setIsCircular(true);
+      setPhase("saving");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+      setPhase("waypoints");
+    }
+  }, [startCoords, waypoints]);
 
   const handleContextMenu = useCallback(
     (event: MapLayerMouseEvent) => {
@@ -150,6 +170,13 @@ export default function VehicleRoutingDriver({
           >
             Définir l'arrivée
           </button>
+          <button
+            onClick={doComputeCircular}
+            disabled={waypoints.length === 0}
+            className="rounded-full bg-purple-600 px-4 py-2 text-xs font-medium text-white shadow active:bg-purple-700 disabled:opacity-40"
+          >
+            Fermer la boucle
+          </button>
         </div>
       )}
 
@@ -167,6 +194,7 @@ export default function VehicleRoutingDriver({
 
       {phase === "saving" && computedRoute && (
         <VehicleSaveDialog
+          isCircular={isCircular}
           onSave={handleSave}
           onSaveAndStart={handleSaveAndStart}
           onCancel={reset}

@@ -23,6 +23,13 @@ function formatDuration(seconds: number): string {
   return `${h} h ${m} min`;
 }
 
+function formatDistanceDuration(meters: number, seconds: number): string | null {
+  const d = Math.round(meters) > 0 ? formatDistance(meters) : null;
+  const t = Math.round(seconds) > 0 ? formatDuration(seconds) : null;
+  if (d && t) return `${d} · ${t}`;
+  return d || t || null;
+}
+
 function instructionLabel(instruction: { type: string; modifier?: string }): string {
   const types: Record<string, string> = {
     depart: "Départ",
@@ -106,9 +113,11 @@ export default function VehicleRouteSteps({ portions, onClose, onStepClick, sele
                     D
                   </div>
                   <span className="text-xs font-semibold text-emerald-700">Départ</span>
-                  <span className="ml-auto text-[10px] text-emerald-600">
-                    {formatDistance(portion.distance)} · {formatDuration(portion.duration)}
-                  </span>
+                  {formatDistanceDuration(portion.distance, portion.duration) && (
+                    <span className="ml-auto text-[10px] text-emerald-600">
+                      {formatDistanceDuration(portion.distance, portion.duration)}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div
@@ -128,9 +137,11 @@ export default function VehicleRouteSteps({ portions, onClose, onStepClick, sele
                       <span className="ml-2 text-xs text-amber-600">{waypointName}</span>
                     )}
                   </div>
-                  <span className="flex-shrink-0 text-[10px] text-amber-600">
-                    {formatDistance(portion.distance)} · {formatDuration(portion.duration)}
-                  </span>
+                  {formatDistanceDuration(portion.distance, portion.duration) && (
+                    <span className="flex-shrink-0 text-[10px] text-amber-600">
+                      {formatDistanceDuration(portion.distance, portion.duration)}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -161,9 +172,11 @@ export default function VehicleRouteSteps({ portions, onClose, onStepClick, sele
                       {name && (
                         <p className="mt-0.5 truncate text-xs text-slate-500">{name}</p>
                       )}
-                      <p className="mt-1 text-[10px] text-slate-400">
-                        {formatDistance(step.distance)} · {formatDuration(step.duration)}
-                      </p>
+                      {formatDistanceDuration(step.distance, step.duration) && (
+                        <p className="mt-1 text-[10px] text-slate-400">
+                          {formatDistanceDuration(step.distance, step.duration)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
@@ -190,6 +203,11 @@ export default function VehicleRouteSteps({ portions, onClose, onStepClick, sele
             A
           </div>
           <span className="text-xs font-semibold text-red-700">Arrivée</span>
+          {formatDistanceDuration(portions.reduce((sum, p) => sum + p.distance, 0), portions.reduce((sum, p) => sum + p.duration, 0)) && (
+            <span className="ml-auto text-[10px] text-red-600">
+              {formatDistanceDuration(portions.reduce((sum, p) => sum + p.distance, 0), portions.reduce((sum, p) => sum + p.duration, 0))}
+            </span>
+          )}
         </div>
       </div>
     </div>

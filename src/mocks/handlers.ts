@@ -186,10 +186,11 @@ export const handlers = [
         route.status = "stopped";
         await putRoute(route);
         const last = timedPoints[timedPoints.length - 1]!;
-        return HttpResponse.json({ position: { lng: last.lng, lat: last.lat }, speedKmh: 0, status: "stopped" });
+        return HttpResponse.json({ position: { lng: last.lng, lat: last.lat }, speedKmh: 0, status: "stopped", remainingTimeSec: 0 });
       }
       const result = interpolateAtTime(timedPoints, elapsedSec);
-      return HttpResponse.json({ ...result, status: "started" });
+      const remainingTimeSec = totalDuration - elapsedSec;
+      return HttpResponse.json({ ...result, status: "started", remainingTimeSec });
     }
 
     // Round-trip: stop at start after one full round
@@ -198,24 +199,52 @@ export const handlers = [
         route.status = "stopped";
         await putRoute(route);
         const first = timedPoints[0]!;
-        return HttpResponse.json({ position: { lng: first.lng, lat: first.lat }, speedKmh: 0, status: "stopped" });
+        return HttpResponse.json({ position: { lng: first.lng, lat: first.lat }, speedKmh: 0, status: "stopped", remainingTimeSec: 0 });
       }
       const forward = elapsedSec < totalDuration;
       const currentTime = forward ? elapsedSec : totalDuration - (elapsedSec - totalDuration);
+      // Remaining time until next endpoint (end if forward, start if backward)
+      const remainingTimeSec = forward ? totalDuration - elapsedSec : totalDuration * 2 - elapsedSec;
       const result = interpolateAtTime(timedPoints, currentTime);
-      return HttpResponse.json({ ...result, status: "started" });
+      return HttpResponse.json({ ...result, status: "started", remainingTimeSec });
     }
 
-    // Continuous: ping-pong forever
+    // Circular once: traverse the loop once then stop (loop already returns to start)
+    if (routeType === "circular_once") {
+      if (elapsedSec >= totalDuration) {
+        route.status = "stopped";
+        await putRoute(route);
+        const first = timedPoints[0]!;
+        return HttpResponse.json({ position: { lng: first.lng, lat: first.lat }, speedKmh: 0, status: "stopped", remainingTimeSec: 0 });
+      }
+      const result = interpolateAtTime(timedPoints, elapsedSec);
+      const remainingTimeSec = totalDuration - elapsedSec;
+      return HttpResponse.json({ ...result, status: "started", remainingTimeSec });
+    }
+
+    // Circular continuous: loop forever in the same direction
+    if (routeType === "circular_continuous") {
+      const currentTime = elapsedSec % totalDuration;
+      const remainingTimeSec = totalDuration - currentTime;
+      const result = interpolateAtTime(timedPoints, currentTime);
+      if (!result) {
+        return HttpResponse.json({ position: null, status: route.status });
+      }
+      return HttpResponse.json({ ...result, status: "started", remainingTimeSec });
+    }
+
+    // Continuous (linear): ping-pong forever
     const cycleTime = elapsedSec % (totalDuration * 2);
     const forward = cycleTime < totalDuration;
     const currentTime = forward ? cycleTime : totalDuration - (cycleTime - totalDuration);
+    // Remaining time until next endpoint (end if forward, start if backward)
+    const remainingTimeSec = forward ? totalDuration - cycleTime : cycleTime - totalDuration;
 
     const result = interpolateAtTime(timedPoints, currentTime);
     if (!result) {
       return HttpResponse.json({ position: null, status: route.status });
     }
 
-    return HttpResponse.json({ ...result, status: "started" });
+    return HttpResponse.json({ ...result, status: "started", remainingTimeSec });
   }),
 ];
