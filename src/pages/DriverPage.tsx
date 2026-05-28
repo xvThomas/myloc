@@ -44,6 +44,7 @@ export default function DriverPage() {
   const [routeStart, setRouteStart] = useState<LatLng | null>(null);
   const [routeWaypoints, setRouteWaypoints] = useState<LatLng[]>([]);
   const [routeEnd, setRouteEnd] = useState<LatLng | null>(null);
+  const [removeLastWaypoint, setRemoveLastWaypoint] = useState<(() => void) | null>(null);
 
   // Get selected route status
   const selectedRoute = routes.find((r) => r.id === selectedRouteId);
@@ -198,7 +199,7 @@ export default function DriverPage() {
           )}
 
           {/* Flags for route being created */}
-          <RouteFlags start={routeStart} end={routeEnd} waypoints={routeWaypoints} routeComputed={false} id="driver-current" />
+          <RouteFlags start={routeStart} end={routeEnd} waypoints={routeWaypoints} routeComputed={false} id="driver-current" onRemoveLastWaypoint={removeLastWaypoint ?? undefined} />
 
           {/* Vehicle position marker */}
           <VehiclePositionMarker vehicle={vehiclePosition} />
@@ -220,6 +221,7 @@ export default function DriverPage() {
             setRouteEnd(end);
             setRouteWaypoints(waypoints);
           }}
+          onRemoveLastWaypointChange={(handler) => setRemoveLastWaypoint(() => handler)}
           onSave={handleSave}
           onSaveAndStart={handleSaveAndStart}
           active={creatingRoute}
@@ -229,7 +231,7 @@ export default function DriverPage() {
       {/* Right panel: route steps */}
       {selectedRouteResult && (
         <VehicleRouteSteps
-          portions={selectedRouteResult.portions}
+          route={selectedRouteResult}
           onClose={() => {
             setSelectedRouteId(null);
             setHighlightedPoint(null);

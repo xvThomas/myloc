@@ -7,9 +7,10 @@ interface RouteFlagsProps {
   waypoints?: LatLng[];
   routeComputed?: boolean;
   id?: string;
+  onRemoveLastWaypoint?: () => void;
 }
 
-export default function RouteFlags({ start, end, waypoints = [], routeComputed = false, id = "default" }: RouteFlagsProps) {
+export default function RouteFlags({ start, end, waypoints = [], routeComputed = false, id = "default", onRemoveLastWaypoint }: RouteFlagsProps) {
   // Detect circular route (start == end)
   const isCircular = !!(start && end && Math.abs(start.lat - end.lat) < 0.0001 && Math.abs(start.lng - end.lng) < 0.0001);
 
@@ -25,7 +26,10 @@ export default function RouteFlags({ start, end, waypoints = [], routeComputed =
 
       {!routeComputed && waypoints.map((wp, i) => (
         <Marker key={`${id}-wp-${i}`} longitude={wp.lng} latitude={wp.lat} anchor="center">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-amber-500 text-[10px] font-bold text-white shadow">
+          <div
+            className={`flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-amber-500 text-[10px] font-bold text-white shadow ${i === waypoints.length - 1 && onRemoveLastWaypoint ? "cursor-pointer ring-2 ring-amber-300" : ""}`}
+            onClick={i === waypoints.length - 1 && onRemoveLastWaypoint ? (e) => { e.stopPropagation(); onRemoveLastWaypoint(); } : undefined}
+          >
             {i + 1}
           </div>
         </Marker>

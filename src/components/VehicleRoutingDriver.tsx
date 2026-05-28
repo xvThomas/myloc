@@ -12,6 +12,7 @@ interface VehicleRoutingDriverProps {
   onMapClickChange: (handler: MapClickHandler) => void;
   onContextMenuChange: (handler: MapClickHandler) => void;
   onPointsChange: (start: LatLng | null, end: LatLng | null, waypoints: LatLng[]) => void;
+  onRemoveLastWaypointChange?: (handler: (() => void) | null) => void;
   onSave: (name: string, routeResult: RouteResult, routeType: RouteType) => void;
   onSaveAndStart: (name: string, routeResult: RouteResult, routeType: RouteType) => void;
   active: boolean;
@@ -21,6 +22,7 @@ export default function VehicleRoutingDriver({
   onMapClickChange,
   onContextMenuChange,
   onPointsChange,
+  onRemoveLastWaypointChange,
   onSave,
   onSaveAndStart,
   active,
@@ -156,6 +158,16 @@ export default function VehicleRoutingDriver({
   useEffect(() => {
     onPointsChange(startCoords, endCoords, waypoints);
   }, [startCoords, endCoords, waypoints, onPointsChange]);
+
+  const removeLastWaypoint = useCallback(() => {
+    setWaypoints((prev) => prev.slice(0, -1));
+  }, []);
+
+  useEffect(() => {
+    if (onRemoveLastWaypointChange) {
+      onRemoveLastWaypointChange(phase === "waypoints" && waypoints.length > 0 ? removeLastWaypoint : null);
+    }
+  }, [phase, waypoints.length, removeLastWaypoint, onRemoveLastWaypointChange]);
 
   return (
     <>
