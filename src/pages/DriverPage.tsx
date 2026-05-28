@@ -6,9 +6,16 @@ import VehiclePositionMarker from "../components/VehiclePositionMarker";
 import VehicleRouteSteps from "../components/VehicleRouteSteps";
 import RouteLayer from "../components/RouteLayer";
 import RouteFlags from "../components/RouteFlags";
-import { useDriverRoutes } from "../hooks/useDriverRoutes";
-import { useVehiclePosition } from "../hooks/useVehiclePosition";
-import { getFullRoute } from "../services/vehicleRouteApi";
+import {
+  useVehicleRouteList,
+  useVehicleRoute,
+  useVehiclePosition,
+  useSaveRoute,
+  useStartRoute,
+  useStopRoute,
+  useDeleteRoute,
+  useRenameRoute,
+} from "../hooks/useVehicleRoutes";
 import type { RouteResult } from "../services/routeService";
 import type { LatLng } from "../types/geo";
 
@@ -16,10 +23,16 @@ const IGN_STYLE = "https://data.geopf.fr/annexes/ressources/vectorTiles/styles/P
 
 export default function DriverPage() {
   const mapRef = useRef<MapRef>(null);
-  const { routes, saveRoute, startRoute, stopRoute, removeRoute, renameRoute } = useDriverRoutes();
+
+  // React Query hooks
+  const { data: routes = [] } = useVehicleRouteList();
+  const saveRouteMutation = useSaveRoute();
+  const startRouteMutation = useStartRoute();
+  const stopRouteMutation = useStopRoute();
+  const deleteRouteMutation = useDeleteRoute();
+  const renameRouteMutation = useRenameRoute();
 
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-  const [selectedRouteResult, setSelectedRouteResult] = useState<RouteResult | null>(null);
   const [creatingRoute, setCreatingRoute] = useState(true);
   const [highlightedPoint, setHighlightedPoint] = useState<LatLng | null>(null);
   const [selectedStep, setSelectedStep] = useState<{ portionIndex: number; stepIndex: number } | null>(null);
@@ -35,30 +48,24 @@ export default function DriverPage() {
   const selectedRoute = routes.find((r) => r.id === selectedRouteId);
   const isStarted = selectedRoute?.status === "started";
 
-  // Poll vehicle position for selected route
-  const vehiclePosition = useVehiclePosition(selectedRouteId, isStarted);
+  // Fetch full route geometry via React Query
+  const { data: fullRoute } = useVehicleRoute(selectedRouteId);
+  const selectedRouteResult = fullRoute?.routeResult ?? null;
 
-  // Load full route geometry when selection changes and fit map to bounds
+  // Poll vehicle position for selected route
+  const { data: vehiclePosition = null } = useVehiclePosition(selectedRouteId, isStarted);
+
+  // Fit map to route bounds when full route loads
   useEffect(() => {
-    if (!selectedRouteId) {
-      setSelectedRouteResult(null);
-      return;
+    if (!selectedRouteResult) return;
+    const bbox = selectedRouteResult.bbox;
+    if (bbox && mapRef.current) {
+      mapRef.current.fitBounds(
+        [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
+        { padding: 60, duration: 500 }
+      );
     }
-    let cancelled = false;
-    getFullRoute(selectedRouteId).then((stored) => {
-      if (cancelled) return;
-      setSelectedRouteResult(stored.routeResult);
-      // Fit map to route bounding box from IGN API
-      const bbox = stored.routeResult.bbox;
-      if (bbox && mapRef.current) {
-        mapRef.current.fitBounds(
-          [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
-          { padding: 60, duration: 500 }
-        );
-      }
-    });
-    return () => { cancelled = true; };
-  }, [selectedRouteId]);
+  }, [selectedRouteResult]);
 
   const handleMapClick = useCallback(
     (event: MapLayerMouseEvent) => {
@@ -85,53 +92,52 @@ export default function DriverPage() {
 
   const handleSave = useCallback(
     async (name: string, routeResult: RouteResult) => {
-      const saved = await saveRoute(name, routeResult);
+      const saved = await saveRouteMutation.mutateAsync({ name, routeResult });
       setSelectedRouteId(saved.id);
       setCreatingRoute(false);
     },
-    [saveRoute]
+    [saveRouteMutation]
   );
 
   const handleSaveAndStart = useCallback(
     async (name: string, routeResult: RouteResult) => {
-      const saved = await saveRoute(name, routeResult);
-      await startRoute(saved.id);
+      const saved = await saveRouteMutation.mutateAsync({ name, routeResult });
+      await startRouteMutation.mutateAsync(saved.id);
       setSelectedRouteId(saved.id);
       setCreatingRoute(false);
     },
-    [saveRoute, startRoute]
+    [saveRouteMutation, startRouteMutation]
   );
 
   const handleStart = useCallback(
     async (id: string) => {
-      await startRoute(id);
+      await startRouteMutation.mutateAsync(id);
     },
-    [startRoute]
+    [startRouteMutation]
   );
 
   const handleStop = useCallback(
     async (id: string) => {
-      await stopRoute(id);
+      await stopRouteMutation.mutateAsync(id);
     },
-    [stopRoute]
+    [stopRouteMutation]
   );
 
   const handleDelete = useCallback(
     async (id: string) => {
-      await removeRoute(id);
+      await deleteRouteMutation.mutateAsync(id);
       if (selectedRouteId === id) {
         setSelectedRouteId(null);
-        setSelectedRouteResult(null);
       }
     },
-    [removeRoute, selectedRouteId]
+    [deleteRouteMutation, selectedRouteId]
   );
 
   const handleRename = useCallback(
     async (id: string, newName: string) => {
-      await renameRoute(id, newName);
+      await renameRouteMutation.mutateAsync({ id, name: newName });
     },
-    [renameRoute]
+    [renameRouteMutation]
   );
 
   const handleSelect = useCallback((id: string) => {
@@ -143,7 +149,6 @@ export default function DriverPage() {
 
   const handleNewRoute = useCallback(() => {
     setSelectedRouteId(null);
-    setSelectedRouteResult(null);
     setCreatingRoute(true);
     setHighlightedPoint(null);
     setSelectedStep(null);
@@ -224,7 +229,6 @@ export default function DriverPage() {
           portions={selectedRouteResult.portions}
           onClose={() => {
             setSelectedRouteId(null);
-            setSelectedRouteResult(null);
             setHighlightedPoint(null);
             setSelectedStep(null);
           }}
